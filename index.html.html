@@ -1,0 +1,374 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Vacunación - Registro de Campo</title>
+    <style>
+        * { box-sizing: border-box; font-family: Arial, sans-serif; }
+        body { background-color: #f4f6f9; margin: 0; padding: 15px; }
+        .header { background: #1b5e20; color: white; padding: 15px; border-radius: 8px; text-align: center; margin-bottom: 15px; }
+        .stats-container { display: flex; gap: 10px; margin-bottom: 15px; }
+        .stat-card { flex: 1; background: white; padding: 10px; border-radius: 8px; text-align: center; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .stat-card h3 { margin: 0; font-size: 20px; color: #2e7d32; }
+        .stat-card p { margin: 5px 0 0 0; font-size: 11px; color: #666; font-weight: bold; }
+        .btn { width: 100%; padding: 12px; border: none; border-radius: 6px; font-weight: bold; font-size: 15px; cursor: pointer; margin-bottom: 10px; box-shadow: 0 2px 4px rgba(0,0,0,0.2); }
+        .btn-main { background: #2e7d32; color: white; }
+        .btn-export { background: #8e24aa; color: white; }
+        .btn-cancel { background: #c62828; color: white; }
+        .btn-gps { background: #f57c00; color: white; padding: 8px; font-size: 12px; }
+        
+        .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); z-index: 100; justify-content: center; align-items: center; }
+        .modal-content { background: white; width: 95%; max-width: 500px; padding: 20px; border-radius: 10px; max-height: 90vh; overflow-y: auto; }
+        
+        .form-group { margin-bottom: 12px; }
+        .form-group label { display: block; font-size: 13px; font-weight: bold; margin-bottom: 4px; }
+        .form-group input, .form-group select { width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 4px; font-size: 16px; }
+        .row { display: flex; gap: 10px; }
+        
+        .table-container { background: white; border-radius: 8px; padding: 10px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); overflow-x: auto; }
+        table { width: 100%; border-collapse: collapse; font-size: 12px; text-align: left; min-width: 450px; }
+        th, td { padding: 8px; border-bottom: 1px solid #ddd; }
+        th { background-color: #e8f5e9; color: #1b5e20; }
+        .visit-badge { background-color: #e8f5e9; color: #1b5e20; font-weight: bold; padding: 5px 10px; border-radius: 4px; display: inline-block; margin-bottom: 10px; }
+    </style>
+</head>
+<body>
+
+    <div class="header">
+        <h2 style="margin:0; font-size: 18px;">VACUNACIÓN - Registro de campo</h2>
+    </div>
+
+    <div class="stats-container">
+        <div class="stat-card"><h3 id="stat-predios">0</h3><p>VISITAS</p></div>
+        <div class="stat-card"><h3 id="stat-perros">0</h3><p>PERROS</p></div>
+        <div class="stat-card"><h3 id="stat-gatos">0</h3><p>GATOS</p></div>
+    </div>
+
+    <button class="btn btn-main" onclick="abrirModal()">+ NUEVO REGISTRO</button>
+    <button class="btn btn-export" onclick="copiarTodoElDia()">📋 COPIAR TODO EL DÍA (EXCEL)</button>
+
+    <div class="table-container">
+        <h4 style="margin: 5px 0 10px 0; color: #333;">Registros del Día</h4>
+        <table>
+            <thead>
+                <tr>
+                    <th>N°</th>
+                    <th>Fecha</th>
+                    <th>Propietario</th>
+                    <th>P.</th>
+                    <th>G.</th>
+                    <th>Actividad</th>
+                    <th>GPS</th>
+                </tr>
+            </thead>
+            <tbody id="tabla-cuerpo"></tbody>
+        </table>
+    </div>
+
+    <!-- Botón Borrar Día -->
+    <button class="btn" style="background-color: #7f8c8d; color: white; margin-top: 30px; font-size: 13px; padding: 10px;" onclick="abrirModalReset()">🔒 BORRAR DÍA (Solo Admin)</button>
+
+    <!-- Modal Formulario Principal -->
+    <div class="modal" id="modalForm">
+        <div class="modal-content">
+            <h3 style="margin-top:0; color: #1b5e20; font-size: 18px;">Nuevo Registro</h3>
+            <div class="visit-badge" id="badgeVisita">Visita N° 1</div>
+            <div class="visit-badge" id="badgeFecha" style="background-color: #e3f2fd; color: #1565c0;"></div>
+            
+            <form id="vacunaForm" onsubmit="guardarRegistro(event)">
+                
+                <div class="row">
+                    <div class="form-group" style="flex:1;">
+                        <label>Código Vet:</label>
+                        <input type="text" id="codigoDigitador" required placeholder="Ej: VET-01">
+                    </div>
+                    <div class="form-group" style="flex:2;">
+                        <label>Nombre:</label>
+                        <input type="text" id="digitador" required placeholder="Ej: Carlos V.">
+                    </div>
+                </div>
+
+                <div class="row">
+                    <div class="form-group" style="flex:2;">
+                        <label>Nombre del Propietario:</label>
+                        <input type="text" id="propietario" required>
+                    </div>
+                    <div class="form-group" style="flex:1;">
+                        <label>Cédula:</label>
+                        <input type="number" id="cedula" required>
+                    </div>
+                </div>
+
+                <div class="row">
+                    <div class="form-group" style="flex:1;">
+                        <label>Zona:</label>
+                        <select id="zona"><option>RURAL</option><option>URBANA</option></select>
+                    </div>
+                    <div class="form-group" style="flex:1;">
+                        <label>Barrio / Vereda:</label>
+                        <input type="text" id="vereda" required>
+                    </div>
+                </div>
+
+                <div class="row">
+                    <div class="form-group" style="flex:1;">
+                        <label>Dirección / Finca:</label>
+                        <input type="text" id="direccion" required>
+                    </div>
+                    <div class="form-group" style="flex:1;">
+                        <label>Celular:</label>
+                        <input type="number" id="celular" required>
+                    </div>
+                </div>
+
+                <div class="row">
+                    <div class="form-group" style="flex:1;">
+                        <label>Total Perros:</label>
+                        <input type="number" id="perros" value="0" min="0" required>
+                    </div>
+                    <div class="form-group" style="flex:1;">
+                        <label>Total Gatos:</label>
+                        <input type="number" id="gatos" value="0" min="0" required>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label>Actividad:</label>
+                    <select id="actividad" onchange="verificarActividad()" required>
+                        <option value="1. Vacuna Antirrabica">1. Vacuna Antirrabica</option>
+                        <option value="2. Otra">2. Otra</option>
+                    </select>
+                </div>
+
+                <div class="form-group" id="cajaOtraActividad" style="display: none;">
+                    <label>Detalle de la Actividad (Obligatorio):</label>
+                    <input type="text" id="detalleOtra" placeholder="Especifique qué actividad realizó">
+                </div>
+
+                <div class="form-group">
+                    <label>Geolocalización (GPS):</label>
+                    <div class="row">
+                        <input type="text" id="coordenadas" readonly placeholder="Presiona Obtener">
+                        <button type="button" class="btn btn-gps" onclick="capturarGPS()">Obtener GPS</button>
+                    </div>
+                </div>
+
+                <button type="submit" class="btn btn-main">GUARDAR DATO</button>
+                <button type="button" class="btn btn-cancel" onclick="cerrarModal()">CANCELAR</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal Reset -->
+    <div class="modal" id="modalReset">
+        <div class="modal-content" style="text-align: center;">
+            <h3 style="color: #c62828; margin-top:0;">⚠️ Limpiar App</h3>
+            <p style="font-size: 14px; color: #555;">Ingresa el PIN maestro para borrar todos los registros de hoy. (El perfil del vacunador se mantendrá).</p>
+            <input type="password" id="pinInput" placeholder="PIN" style="width: 100%; padding: 10px; font-size: 20px; text-align: center; letter-spacing: 5px; margin-bottom: 15px; border: 1px solid #ccc; border-radius: 4px;">
+            <div class="row">
+                <button class="btn btn-cancel" style="flex:1;" onclick="confirmarReset()">BORRAR TODO</button>
+                <button class="btn" style="flex:1; background: #95a5a6; color: white;" onclick="cerrarModalReset()">CANCELAR</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // =========================================================
+        // CLAVE MAESTRA DEL ADMINISTRADOR (Cámbiala cuando quieras)
+        const PIN_ADMIN = "2026"; 
+        // =========================================================
+
+        let registros = JSON.parse(localStorage.getItem('vacunacion_registros')) || [];
+
+        document.addEventListener("DOMContentLoaded", () => {
+            cargarPerfil();
+            actualizarInterfaz();
+        });
+
+        function cargarPerfil() {
+            const ultimoCodigo = localStorage.getItem('vacuna_codigo');
+            const ultimoDigitador = localStorage.getItem('vacuna_digitador');
+            if(ultimoCodigo) document.getElementById('codigoDigitador').value = ultimoCodigo;
+            if(ultimoDigitador) document.getElementById('digitador').value = ultimoDigitador;
+        }
+
+        function verificarActividad() {
+            const seleccion = document.getElementById('actividad').value;
+            const cajaOtra = document.getElementById('cajaOtraActividad');
+            const detalleInput = document.getElementById('detalleOtra');
+
+            if(seleccion === "2. Otra") {
+                cajaOtra.style.display = "block";
+                detalleInput.setAttribute("required", "true");
+            } else {
+                cajaOtra.style.display = "none";
+                detalleInput.removeAttribute("required");
+                detalleInput.value = "";
+            }
+        }
+
+        function abrirModal() {
+            document.getElementById('vacunaForm').reset();
+            verificarActividad(); 
+            cargarPerfil();
+            
+            const numVisita = registros.length + 1;
+            const fechaHoy = new Date().toLocaleDateString('es-CO');
+            
+            document.getElementById('badgeVisita').innerText = `Visita N° ${numVisita}`;
+            document.getElementById('badgeFecha').innerText = `Fecha: ${fechaHoy}`;
+            document.getElementById('modalForm').style.display = 'flex';
+        }
+
+        function cerrarModal() {
+            document.getElementById('modalForm').style.display = 'none';
+        }
+
+        function capturarGPS() {
+            const campoGPS = document.getElementById('coordenadas');
+            campoGPS.value = "Obteniendo...";
+            
+            const timeoutGPS = setTimeout(() => {
+                if (campoGPS.value === "Obteniendo...") {
+                    campoGPS.value = "Error: Sin señal GPS";
+                    alert("No se pudo conectar al satélite. Verifica que la ubicación esté encendida.");
+                }
+            }, 8000);
+
+            if (navigator.geolocation) {
+                navigator.geolocation.getCurrentPosition(
+                    (pos) => { 
+                        clearTimeout(timeoutGPS);
+                        campoGPS.value = `${pos.coords.latitude.toFixed(5)}, ${pos.coords.longitude.toFixed(5)}`; 
+                    },
+                    (err) => { 
+                        clearTimeout(timeoutGPS);
+                        alert("Permiso de ubicación denegado o GPS apagado."); 
+                        campoGPS.value = "Sin GPS"; 
+                    },
+                    { enableHighAccuracy: true, timeout: 7000 }
+                );
+            } else {
+                campoGPS.value = "No soportado";
+            }
+        }
+
+        function guardarRegistro(e) {
+            e.preventDefault();
+            
+            const codigo = document.getElementById('codigoDigitador').value.toUpperCase();
+            const digitador = document.getElementById('digitador').value.toUpperCase();
+            const actividadBase = document.getElementById('actividad').value;
+            const actividadDetalle = document.getElementById('detalleOtra').value;
+            
+            localStorage.setItem('vacuna_codigo', codigo);
+            localStorage.setItem('vacuna_digitador', digitador);
+
+            const nuevo = {
+                visitaNum: registros.length + 1,
+                fecha: new Date().toLocaleDateString('es-CO'),
+                codigoDigitador: codigo,
+                digitador: digitador,
+                propietario: document.getElementById('propietario').value.toUpperCase(),
+                cedula: document.getElementById('cedula').value,
+                zona: document.getElementById('zona').value,
+                vereda: document.getElementById('vereda').value.toUpperCase(),
+                direccion: document.getElementById('direccion').value.toUpperCase(),
+                celular: document.getElementById('celular').value,
+                perros: parseInt(document.getElementById('perros').value) || 0,
+                gatos: parseInt(document.getElementById('gatos').value) || 0,
+                actividad: actividadBase,
+                detalleExtra: actividadDetalle,
+                gps: document.getElementById('coordenadas').value || "N/A"
+            };
+
+            registros.push(nuevo);
+            localStorage.setItem('vacunacion_registros', JSON.stringify(registros));
+            actualizarInterfaz();
+            cerrarModal();
+        }
+
+        function actualizarInterfaz() {
+            const tbody = document.getElementById('tabla-cuerpo');
+            tbody.innerHTML = "";
+            
+            let totalP = 0, totalG = 0;
+
+            registros.forEach((r) => {
+                totalP += r.perros;
+                totalG += r.gatos;
+                tbody.innerHTML += `
+                    <tr>
+                        <td><b>#${r.visitaNum}</b></td>
+                        <td>${r.fecha}</td>
+                        <td>${r.propietario}</td>
+                        <td>${r.perros}</td>
+                        <td>${r.gatos}</td>
+                        <td>${r.actividad === '2. Otra' ? 'OTRA' : 'VACUNA'}</td>
+                        <td>${(r.gps !== "N/A" && r.gps !== "Sin GPS" && !r.gps.includes("Error")) ? '✅' : '❌'}</td>
+                    </tr>
+                `;
+            });
+
+            document.getElementById('stat-predios').innerText = registros.length;
+            document.getElementById('stat-perros').innerText = totalP;
+            document.getElementById('stat-gatos').innerText = totalG;
+        }
+
+        function copiarTodoElDia() {
+            if(registros.length === 0) {
+                alert("No hay registros guardados en el día para copiar.");
+                return;
+            }
+
+            let t = "Visita N°\tFecha\tCódigo Vet\tNombre Vet\tPropietario\tCédula\tZona\tBarrio/Vereda\tDirección\tCelular\tPerros\tGatos\tActividad\tDetalle Actividad\tGPS\n";
+            
+            registros.forEach(r => {
+                let prop = r.propietario.replace(/\n/g, " ");
+                let ver = r.vereda.replace(/\n/g, " ");
+                let dir = r.direccion.replace(/\n/g, " ");
+                let det = r.detalleExtra.replace(/\n/g, " ");
+                
+                t += `${r.visitaNum}\t${r.fecha}\t${r.codigoDigitador}\t${r.digitador}\t${prop}\t${r.cedula}\t${r.zona}\t${ver}\t${dir}\t${r.celular}\t${r.perros}\t${r.gatos}\t${r.actividad}\t${det}\t${r.gps}\n`;
+            });
+
+            let area = document.createElement("textarea");
+            area.value = t;
+            document.body.appendChild(area);
+            area.select();
+            area.setSelectionRange(0, 99999);
+            
+            try {
+                document.execCommand("copy");
+                alert("✅ ¡Todo el trabajo del día ha sido copiado!\n\nVe a tu matriz de Excel y presiona Pegar en la celda A1.");
+            } catch (err) {
+                alert("Tu dispositivo bloqueó la copia automática.");
+            }
+            
+            document.body.removeChild(area);
+        }
+
+        // FUNCIONES DE RESETEO
+        function abrirModalReset() {
+            document.getElementById('pinInput').value = "";
+            document.getElementById('modalReset').style.display = 'flex';
+        }
+
+        function cerrarModalReset() {
+            document.getElementById('modalReset').style.display = 'none';
+        }
+
+        function confirmarReset() {
+            const pinIngresado = document.getElementById('pinInput').value;
+            if (pinIngresado === PIN_ADMIN) {
+                localStorage.removeItem('vacunacion_registros');
+                alert("✅ Registros borrados correctamente. La app está en blanco para el nuevo día.");
+                window.location.reload();
+            } else {
+                alert("❌ PIN incorrecto. Acceso denegado.");
+            }
+        }
+    </script>
+</body>
+</html>
